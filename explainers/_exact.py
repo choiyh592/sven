@@ -1,9 +1,27 @@
 import torch
 import logging
-from tqdm import tqdm
+import tqdm as tqdm
 
-class Explainer():
+class ExactExplainer():
+    """
+    An exact explainer for PyTorch models. This explainer calculates exact SHAP values for a given PyTorch model and dataset.
+    The explainer is based on the paper "A Unified Approach to Interpreting Model Predictions" by Lundberg and Lee (2017)."
+    As the explainer calculates exact SHAP values, it is not suitable for large datasets or models with a large number of features.
+    If the dataset is large, consider using ApproximateExplainer1 or ApproximateExplainer2 instead.
+    """
     def __init__(self, torchmodel, tensordataset, featurevector_size, method='regression', num_to_sample=None, nan=0, tolerance = 0.01, device='cuda'):
+        """
+        Initializes the explainer.
+        Args:
+            torchmodel (torch.nn.Module): The PyTorch model to explain.
+            tensordataset (torch.utils.data.TensorDataset): The dataset to explain.
+            featurevector_size (int): The size of the feature vector.
+            method (str): The method of the model. Must be one of 'binary_classification_0', 'binary_classification_1', 'regression', 'binary_classification_0_logodds', 'binary_classification_1_logodds'.
+            num_to_sample (int): The number of instances to sample from the dataset. If None, samples all instances.
+            nan (int): The value to replace NaNs with.
+            tolerance (float): The tolerance for the SHAP values to sum to the expected value.
+            device (str): The device to use. Must be one of 'cuda', 'cpu'.
+        """
         self._model = torchmodel
         self._method = method
         self._featurevector_size = featurevector_size
@@ -66,7 +84,7 @@ class Explainer():
     
     def _calculate_shapley_value_for_all_instances(self):
         all_coalition_vectors = self._generate_coalition_vectors(self._num_features, self._featurevector_size)
-        all_coalition_vectors_rev = self._generate_coalition_vectors(self._num_features, self._featurevector_size, reversed=True)
+        all_coalition_vectors_rev = 1 - all_coalition_vectors
 
         for instance_idx, instance in enumerate(tqdm(self._dataset[:][0], position=0, desc='[INIT] Calculating SHAP values for instances')):
             self._calculate_shapley_value_for_instance(instance, all_coalition_vectors, all_coalition_vectors_rev, instance_idx)
