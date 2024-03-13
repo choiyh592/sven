@@ -1,6 +1,10 @@
 # Overview
 
+### Exact Estimation Overview
 ![](/img/shap_estimation_exact.png)
+
+### Approximation Overview
+![](/img/shap_approximation.png)
 
 Development in process
 
