@@ -1,6 +1,6 @@
 # Overview
 
-### Exact Estimation Overview
+### Exact Computation Overview
 ![](/img/shap_estimation_exact.png)
 
 ### Approximation Overview
