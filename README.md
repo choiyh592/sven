@@ -7,8 +7,8 @@ Development in process
 
 # How to use
 ```python
-from sven.explainers import Explainer
+from sven import ExactExplainer # or ApproxExplainer1
 
-svenexplainer = Explainer(torch_model, tensor_dataset, feature_vector_size, method='your_method', nan=0, device='cuda')
+svenexplainer = ExactExplainer(torch_model, tensor_dataset, feature_vector_size, method='your_method', nan=0, device='cuda')
 
 ```
