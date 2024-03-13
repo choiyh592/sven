@@ -1,6 +1,6 @@
 # Overview
 
-![](/img/shap_estimation.png)
+![](/img/shap_estimation_exact.png)
 
 Development in process
 
