@@ -20,6 +20,7 @@ class ApproxExplainer1():
             tolerance (float): The tolerance for the SHAP values to sum to the expected value.
             device (str): The device to use. Must be one of 'cuda', 'cpu'.
         """
+        logging.basicConfig(level=logging.INFO)
         self._model = torchmodel
         self._method = method
         self._featurevector_size = featurevector_size
@@ -62,6 +63,8 @@ class ApproxExplainer1():
 
         if torch.mean(torch.abs(self._true_predictions - self._shap_summations)) > tolerance:
             logging.warning('SHAP values do not sum to the expected value within the given tolerance.')
+        
+        logging.info('Initialization complete.')
     
     def _generate_coalition_vector_indices(self, length):
         random_tensors_list = torch.randint(0, 2, (self._sample_batch_size, length), device='cuda')
