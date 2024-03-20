@@ -1,6 +1,6 @@
 import torch
 import logging
-from tqdm import tqdm
+from tqdm import tqdm as tqdm_
 
 class ApproxExplainer2():
     """
@@ -78,7 +78,7 @@ class ApproxExplainer2():
 
         all_coalition_vectors_rev = 1 - all_coalition_vectors
 
-        for instance_idx, instance in enumerate(tqdm(self._dataset[:][0], position=0, desc='[INIT] Calculating SHAP values for instances')):
+        for instance_idx, instance in enumerate(tqdm_(self._dataset[:][0], position=0, desc='[INIT] Calculating SHAP values for instances')):
             self._calculate_shapley_value_for_instance(instance, all_coalition_vectors, all_coalition_vectors_rev, instance_idx)
 
     def _calculate_shapley_value_for_instance(self, instance, all_coalition_vectors, all_coalition_vectors_rev, instance_idx):

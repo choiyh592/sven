@@ -1,6 +1,6 @@
 import torch
 import logging
-from tqdm import tqdm
+from tqdm import tqdm as tqdm_
 
 class ExactExplainerW():
     """
@@ -54,7 +54,8 @@ class ExactExplainerW():
         else:
             if device == 'cuda':
                 logging.warning('CUDA not available. Using CPU.')
-            self._device = 'cpu'
+                self._device = 'cpu'
+            else: self._device = device
 
         self._shap_values = torch.zeros((self._num_instances, self._num_features), device=self._device)
         self._true_predictions = self._all_predictions()
@@ -82,7 +83,7 @@ class ExactExplainerW():
         all_coalition_vectors = self._generate_coalition_vectors(self._num_features, self._featurevector_sizes)
         all_coalition_vectors_rev = 1 - all_coalition_vectors
 
-        for instance_idx, instance in enumerate(tqdm(self._dataset[:][0], position=0, desc='[INIT] Calculating SHAP values for instances')):
+        for instance_idx, instance in enumerate(tqdm_(self._dataset[:][0], position=0, desc='[INIT] Calculating SHAP values for instances')):
             self._calculate_shapley_value_for_instance(instance, all_coalition_vectors, all_coalition_vectors_rev, instance_idx)
 
     def _calculate_shapley_value_for_instance(self, instance, all_coalition_vectors, all_coalition_vectors_rev, instance_idx):
