@@ -2,11 +2,11 @@ import torch
 import logging
 from tqdm import tqdm as tqdm_
 
-class ApproxExplainer1():
+class ApproxExplainerW():
     """
     SHAP explainer utilizing the approximation algorithm 1 presented in http://dx.doi.org/10.1007/s10115-013-0679-x by Strumbelj et al.(2014) for PyTorch models.
     """
-    def __init__(self, torchmodel, tensordataset, featurevector_size, method='regression', num_to_sample=None, sample_batch_size=None, nan=0, tolerance = 0.01, device='cuda'):
+    def __init__(self, torchmodel, tensordataset, featurevector_sizes, unitsize = 1, method='regression', num_to_sample=None, sample_batch_size=None, nan=0, tolerance = 0.05, device='cuda'):
         """
         Initializes the explainer.
         Args:
@@ -23,7 +23,7 @@ class ApproxExplainer1():
         logging.basicConfig(level=logging.INFO)
         self._model = torchmodel
         self._method = method
-        self._featurevector_size = featurevector_size
+        self._featurevector_sizes = featurevector_sizes
         assert method in ['binary_classification_0', 'binary_classification_1', 'regression', 'binary_classification_0_logodds', 'binary_classification_1_logodds'], 'Invalid method'
 
         if torch.isnan(tensordataset.tensors[0]).any():
@@ -32,7 +32,9 @@ class ApproxExplainer1():
             
         self._dataset = tensordataset
         self._num_instances = len(self._dataset)
-        self._num_features = int(len(self._dataset[0][0]) / self._featurevector_size)
+        assert torch.sum(self._featurevector_sizes) == len(self._dataset[0][0]), f'The sum of the featurevector_sizes {torch.sum(self._featurevector_sizes)}'\
+            f' must be equal to the length of the feature vector {len(self._dataset[0][0])}'
+        self._num_features = len(self._featurevector_sizes)
         
         if sample_batch_size is not None:
             self._sample_batch_size = sample_batch_size
@@ -55,7 +57,6 @@ class ApproxExplainer1():
                 self._device = 'cpu'
             else: self._device = device
 
-
         self._shap_values = torch.zeros((self._num_instances, self._num_features), device=self._device)
         self._true_predictions = self._all_predictions()
         self._shap_expectation = self._true_predictions.mean().item()
@@ -63,23 +64,26 @@ class ApproxExplainer1():
 
         self._shap_summations = torch.sum(self._shap_values, dim=1) + self._shap_expectation
 
-        if torch.mean(torch.abs(self._true_predictions - self._shap_summations)) > tolerance:
-            logging.warning('SHAP values do not sum to the expected value within the given tolerance.')
+        error = torch.mean(torch.abs(self._true_predictions - self._shap_summations))
+        if torch.mean(error) > tolerance:
+            logging.warning(f'SHAP values do not sum to the expected value within the given tolerance, Error: {error.item()}')
+        
+        self._shap_weighted = self._shap_values / (self._featurevector_sizes.to(device) / unitsize)
         
         logging.info('Initialization complete.')
     
     def _generate_coalition_vector_indices(self, length):
-        random_tensors_list = torch.randint(0, 2, (self._sample_batch_size, length), device=self._device)
+        random_tensors_list = torch.cat([torch.randint(0, 2, (self._sample_batch_size, length), device=self._device)])
         return random_tensors_list
     
     def _calculate_shapley_value_for_all_instances(self):
-        all_coalition_vectors = torch.zeros(size=(self._num_batches_to_sample * self._sample_batch_size, self._num_features * self._featurevector_size), device=self._device)
-        self._all_coalition_vectors = all_coalition_vectors
+        all_coalition_vectors = torch.zeros(size=(self._num_batches_to_sample * self._sample_batch_size, torch.sum(self._featurevector_sizes).item()), device=self._device)
         for i in range(self._num_batches_to_sample):
             all_indices = self._generate_coalition_vector_indices(self._num_features)
             for j, indices in enumerate(all_indices):
                 for k, idx in enumerate(indices):
-                    all_coalition_vectors[j + i * self._sample_batch_size, k * self._featurevector_size : (k + 1) * self._featurevector_size] = idx
+                    feature_vector_start_idx = torch.sum(self._featurevector_sizes[:k]).item()
+                    all_coalition_vectors[j + i * self._sample_batch_size, feature_vector_start_idx : feature_vector_start_idx + self._featurevector_sizes[k]] = idx
 
         all_coalition_vectors_rev = 1 - all_coalition_vectors
 
@@ -92,18 +96,19 @@ class ApproxExplainer1():
     
     def _calculate_shapley_value_for_feature_approx(self, instance, all_coalition_vectors_orig, all_coalition_vectors_rev_orig, feature_index):
         all_coalated_instances = all_coalition_vectors_orig.clone()
-        all_coalated_instances[:, feature_index * self._featurevector_size : (feature_index + 1) * self._featurevector_size] = 1
+        feature_vector_start_idx = torch.sum(self._featurevector_sizes[:feature_index]).item()
+        all_coalated_instances[:, feature_vector_start_idx : feature_vector_start_idx + self._featurevector_sizes[feature_index]] = 1
         all_coalated_instances *= instance
         all_coalition_samples = all_coalition_vectors_rev_orig.clone()
-        all_coalition_samples[:, feature_index * self._featurevector_size : (feature_index + 1) * self._featurevector_size] = 0
+        all_coalition_samples[:, feature_vector_start_idx : feature_vector_start_idx + self._featurevector_sizes[feature_index]] = 0
         all_coalition_samples *= self._sampleddata
         all_coalated_instances += all_coalition_samples
 
         all_coalated_instances_without_i = all_coalition_vectors_orig.clone()
-        all_coalated_instances_without_i[:, feature_index * self._featurevector_size : (feature_index + 1) * self._featurevector_size] = 0
+        all_coalated_instances_without_i[:, feature_vector_start_idx : feature_vector_start_idx + self._featurevector_sizes[feature_index]] = 0
         all_coalated_instances_without_i *= instance
         all_coalition_samples_with_i = all_coalition_vectors_rev_orig.clone()
-        all_coalition_samples_with_i[:, feature_index * self._featurevector_size : (feature_index + 1) * self._featurevector_size] = 1
+        all_coalition_samples_with_i[:, feature_vector_start_idx : feature_vector_start_idx + self._featurevector_sizes[feature_index]] = 1
         all_coalition_samples_with_i *= self._sampleddata
         all_coalated_instances_without_i += all_coalition_samples_with_i
 
@@ -171,6 +176,10 @@ class ApproxExplainer1():
         Returns the SHAP expectation.
         """
         return self._shap_expectation
+    
+    @property
+    def shap_weighted(self):
+        return self._shap_weighted
 
 if __name__ == "main":
     pass
